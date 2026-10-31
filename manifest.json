@@ -1,9 +1,9 @@
 {
   "identity": "fluxdown@anime-archive",
   "name": "Anime Archive",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "description": "Organize recognized anime episodes into one title folder across all seasons.",
-  "homepage": "https://github.com/gulanthys/fluxdown-anime-archive",
+  "homepage": "https://github.com/gulanthys",
   "minAppVersion": "0.6.4",
   "permissions": ["archive"],
   "main": { "entry": "main.js" },

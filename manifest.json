@@ -1,14 +1,15 @@
 {
   "identity": "fluxdown@anime-archive",
   "name": "FluxDown Classification",
-  "version": "1.1.0",
-  "description": "Locally classifies video, documents, images, music and ebooks into safe archive folders.",
+  "version": "1.2.0",
+  "description": "Creates local multi-level folders from source metadata and declarative classification rules; preserves downloaded filenames.",
   "homepage": "https://github.com/gulanthys",
   "minAppVersion": "0.6.4",
   "permissions": ["archive"],
   "main": { "entry": "main.js" },
   "contributes": { "archive": "archive.js", "views": [{ "id": "settings", "title": "Classification rules", "location": "settings" }] },
   "settings": [
+    { "key": "ruleDocument", "title": "Classification and layout rules", "description": "Version 1 JSON document. Empty uses bundled rules; personal overrides are preserved across plugin updates.", "type": "string", "default": "" },
     { "key": "aliases", "title": "Title aliases", "description": "Map stable entity keys or parsed titles to folder names.", "type": "string", "default": "{}" },
     { "key": "rules", "title": "Filename rules", "description": "Ordered include, exclude and assign rules.", "type": "string", "default": "[]" },
     { "key": "videoGrouping", "title": "Video grouping", "description": "Choose creator, collection or automatic grouping.", "type": "string", "default": "auto" }

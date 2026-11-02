@@ -1,0 +1,289 @@
+{
+  "version": 1,
+  "classifiers": [
+    {
+      "id": "source-video",
+      "when": {
+        "all": [
+          {
+            "field": "mediaKind",
+            "in": [
+              "post",
+              "series",
+              "video"
+            ]
+          },
+          {
+            "any": [
+              { "field": "extension", "in": ["mkv", "mp4", "m4v", "avi", "wmv", "mov", "webm", "flv", "ts", "m2ts"] },
+              { "field": "extension", "exists": false }
+            ]
+          }
+        ]
+      },
+      "category": "video"
+    },
+    {
+      "id": "video-extension",
+      "when": {
+        "field": "extension",
+        "in": [
+          "mkv",
+          "mp4",
+          "m4v",
+          "avi",
+          "wmv",
+          "mov",
+          "webm",
+          "flv",
+          "ts",
+          "m2ts"
+        ]
+      },
+      "category": "video"
+    },
+    {
+      "id": "document-extension",
+      "when": {
+        "field": "extension",
+        "in": [
+          "pdf",
+          "doc",
+          "docx",
+          "odt",
+          "rtf",
+          "txt",
+          "md",
+          "ppt",
+          "pptx",
+          "xls",
+          "xlsx",
+          "csv"
+        ]
+      },
+      "category": "document"
+    },
+    {
+      "id": "image-extension",
+      "when": {
+        "field": "extension",
+        "in": [
+          "jpg",
+          "jpeg",
+          "png",
+          "gif",
+          "webp",
+          "bmp",
+          "tif",
+          "tiff",
+          "svg",
+          "heic",
+          "avif"
+        ]
+      },
+      "category": "image"
+    },
+    {
+      "id": "music-extension",
+      "when": {
+        "field": "extension",
+        "in": [
+          "mp3",
+          "flac",
+          "wav",
+          "m4a",
+          "aac",
+          "ogg",
+          "opus",
+          "wma",
+          "aiff"
+        ]
+      },
+      "category": "music"
+    },
+    {
+      "id": "book-extension",
+      "when": {
+        "field": "extension",
+        "in": [
+          "epub",
+          "mobi",
+          "azw",
+          "azw3",
+          "fb2"
+        ]
+      },
+      "category": "book"
+    },
+    {
+      "id": "archive-extension",
+      "when": {
+        "field": "extension",
+        "in": [
+          "zip",
+          "rar",
+          "7z",
+          "tar",
+          "gz",
+          "bz2",
+          "xz",
+          "cbz",
+          "cbr"
+        ]
+      },
+      "category": "archive"
+    },
+    {
+      "id": "software-extension",
+      "when": {
+        "field": "extension",
+        "in": [
+          "exe",
+          "msi",
+          "apk",
+          "aab",
+          "dmg",
+          "iso",
+          "deb",
+          "rpm",
+          "cab"
+        ]
+      },
+      "category": "software"
+    }
+  ],
+  "layouts": [
+    {
+      "id": "source-video-folders",
+      "when": {
+        "all": [
+          {
+            "field": "category",
+            "equals": "video"
+          },
+          {
+            "any": [
+              {
+                "field": "creatorName",
+                "exists": true
+              },
+              {
+                "field": "seriesTitle",
+                "exists": true
+              },
+              {
+                "field": "collectionTitle",
+                "exists": true
+              }
+            ]
+          }
+        ]
+      },
+      "directories": [
+        {
+          "text": "视频"
+        },
+        {
+          "field": "platformName",
+          "onMissing": "omit"
+        },
+        {
+          "field": "creatorName",
+          "onMissing": "omit"
+        },
+        {
+          "field": "seriesTitle",
+          "onMissing": "omit"
+        },
+        {
+          "field": "collectionTitle",
+          "onMissing": "omit"
+        }
+      ]
+    },
+    {
+      "id": "video-folder",
+      "when": {
+        "field": "category",
+        "equals": "video"
+      },
+      "directories": [
+        {
+          "text": "视频"
+        }
+      ]
+    },
+    {
+      "id": "document-folder",
+      "when": {
+        "field": "category",
+        "equals": "document"
+      },
+      "directories": [
+        {
+          "text": "文档"
+        }
+      ]
+    },
+    {
+      "id": "image-folder",
+      "when": {
+        "field": "category",
+        "equals": "image"
+      },
+      "directories": [
+        {
+          "text": "图片"
+        }
+      ]
+    },
+    {
+      "id": "music-folder",
+      "when": {
+        "field": "category",
+        "equals": "music"
+      },
+      "directories": [
+        {
+          "text": "音乐"
+        }
+      ]
+    },
+    {
+      "id": "book-folder",
+      "when": {
+        "field": "category",
+        "equals": "book"
+      },
+      "directories": [
+        {
+          "text": "书籍"
+        }
+      ]
+    },
+    {
+      "id": "archive-folder",
+      "when": {
+        "field": "category",
+        "equals": "archive"
+      },
+      "directories": [
+        {
+          "text": "压缩包"
+        }
+      ]
+    },
+    {
+      "id": "software-folder",
+      "when": {
+        "field": "category",
+        "equals": "software"
+      },
+      "directories": [
+        {
+          "text": "软件"
+        }
+      ]
+    }
+  ]
+}

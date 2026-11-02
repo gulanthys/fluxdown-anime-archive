@@ -11,12 +11,16 @@ await rm(dist, { recursive: true, force: true });
 await rm(join(root, archiveName), { force: true });
 await rm(join(root, `${archiveName}.zip`), { force: true });
 await mkdir(dist, { recursive: true });
+const seedRules = await readFile(join(root, 'rules.json'), 'utf8');
+JSON.parse(seedRules);
+const seed = `globalThis.AnimeArchiveSeedRules = ${seedRules};\n`;
 const parser = await readFile(join(root, 'parser.js'), 'utf8');
+const classifier = await readFile(join(root, 'classifier.js'), 'utf8');
 const anitomy = await readFile(join(root, 'vendor/anitomy-0.0.35/anitomy.mjs'), 'utf8');
 const license = await readFile(join(root, 'vendor/anitomy-0.0.35/LICENSE'), 'utf8');
 const attribution = `/*\n * anitomy@0.0.35, https://github.com/yjl9903/anitomy\n * MIT License; bundled from https://registry.npmjs.org/anitomy/-/anitomy-0.0.35.tgz\n${license.split(/\r?\n/).map(line => ` * ${line}`).join('\n')}\n */\n`;
 for (const name of ['archive.js', 'main.js']) {
-  const source = attribution + anitomy + '\n' + parser + '\n' + await readFile(join(root, name), 'utf8');
+  const source = attribution + anitomy + '\n' + seed + classifier + '\n' + parser + '\n' + await readFile(join(root, name), 'utf8');
   await writeFile(join(dist, name), source);
 }
 await writeFile(join(dist, 'manifest.json'), manifestText);

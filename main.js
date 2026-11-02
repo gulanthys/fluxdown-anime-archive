@@ -11,7 +11,8 @@ function updatePreview(state) {
     var lines = String(state.fileName || '').split(/\r?\n/).filter(function (x) { return x.trim(); });
     state.preview = lines.map(function (name) {
       var result = AnimeArchiveParser.evaluate(name.trim(), cfg);
-      return name.trim() + ': ' + (result && result.folderName ? result.folderName + ' — ' + result.reason : 'unchanged' + (result && result.reason ? ' — ' + result.reason : ''));
+      var destination = result && (result.directories ? result.directories.join(' / ') : result.folderName);
+      return name.trim() + ': ' + (destination ? destination + ' — ' + result.reason : 'unchanged' + (result && result.reason ? ' — ' + result.reason : ''));
     }).join('\n');
     state.error = '';
   } catch (error) { state.preview = ''; state.error = String(error.message || error); }
@@ -27,7 +28,7 @@ function ruleFromState(state) {
 }
 flux.ui.view('settings', {
   init: function () {
-    try { var c = animeSettings(); return { config: c, isGroup: false, fileName: '', metadataText: '', aliasFrom: '', aliasTo: '', rulePattern: '', ruleExtensions: '', ruleAll: '', ruleAny: '', ruleNot: '', ruleAction: 'include', ruleTitle: '', videoGrouping: c.videoGrouping || 'auto', aliases: Object.keys(c.aliases).map(function (k) { return { from: k, to: c.aliases[k] }; }), rules: c.rules, error: '', preview: '' }; }
+    try { var c = animeSettings(); return { config: c, ruleDocumentText: JSON.stringify(c.ruleDocument, null, 2), isGroup: false, fileName: '', metadataText: '', aliasFrom: '', aliasTo: '', rulePattern: '', ruleExtensions: '', ruleAll: '', ruleAny: '', ruleNot: '', ruleAction: 'include', ruleTitle: '', videoGrouping: c.videoGrouping || 'auto', aliases: Object.keys(c.aliases).map(function (k) { return { from: k, to: c.aliases[k] }; }), rules: c.rules, error: '', preview: '' }; }
     catch (error) { return { fileName: '', aliases: [], rules: [], error: String(error.message || error), preview: '' }; }
   },
   render: function (state) {
@@ -38,6 +39,10 @@ flux.ui.view('settings', {
       h('switch', { key: 'preview-group', label: 'Task group preview (keep member directories)', checked: !!state.isGroup }),
       h('select', { key: 'video-grouping', value: state.videoGrouping || 'auto', options: [{ value: 'auto', label: 'Automatic' }, { value: 'creator', label: 'Creator' }, { value: 'collection', label: 'Collection' }] }),
       h('text', { text: state.error || state.preview || 'No classification match' }),
+      h('text', { text: 'Classification and folder layout rules (JSON). Each directory segment is created inside the authorized download root. Filename extensions are hints, not content inspection.' }),
+      h('textarea', { key: 'rule-document', value: state.ruleDocumentText || '', placeholder: 'Rule document JSON', rows: 12 }),
+      h('button', { key: 'save-document', text: 'Validate and save rules' }),
+      h('button', { key: 'reset-document', text: 'Use bundled rules' }),
       h('input', { key: 'alias-source', value: state.aliasFrom || '', placeholder: 'Alias source title' }),
       h('input', { key: 'alias-target', value: state.aliasTo || '', placeholder: 'Display folder title' }),
       h('button', { key: 'save-alias', text: 'Add or update alias' }),
@@ -68,6 +73,7 @@ flux.ui.view('settings', {
       if (ev.type === 'change') {
         var value = String(ev.value || '');
         if (id === 'filename') state.fileName = value;
+        else if (id === 'rule-document') state.ruleDocumentText = value;
         else if (id === 'source-metadata') state.metadataText = value;
         else if (id === 'preview-group') state.isGroup = ev.value === true;
         else if (id === 'video-grouping') { await updateSettings(state, { videoGrouping: value }); state.videoGrouping = value; }
@@ -80,6 +86,12 @@ flux.ui.view('settings', {
         else if (id === 'rule-not') state.ruleNot = value;
         else if (id === 'rule-action') state.ruleAction = value;
         else if (id === 'rule-title') state.ruleTitle = value;
+      } else if (ev.type === 'press' && id === 'save-document') {
+        await updateSettings(state, { ruleDocument: state.ruleDocumentText });
+        state.ruleDocumentText = JSON.stringify(state.config.ruleDocument, null, 2);
+      } else if (ev.type === 'press' && id === 'reset-document') {
+        await updateSettings(state, { ruleDocument: '' });
+        state.ruleDocumentText = JSON.stringify(state.config.ruleDocument, null, 2);
       } else if (ev.type === 'press' && id === 'save-alias') {
         var aliases = Object.assign({}, state.config.aliases);
         var source = state.aliasFrom.trim();

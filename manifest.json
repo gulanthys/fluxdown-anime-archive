@@ -1,5 +1,5 @@
 {
-  "identity": "fluxdown@anime-archive",
+  "identity": "gulanthys@anime-archive",
   "name": "FluxDown Classification",
   "version": "1.5.0",
   "description": "Requests stable built-in save categories using host-observed file content only; preserves downloaded filenames.",

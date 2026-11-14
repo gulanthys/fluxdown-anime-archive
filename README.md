@@ -2,6 +2,8 @@
 
 Version **1.5.0**. Completed file content requests a stable built-in save category. No filename/extension fallback, episode parsing, source-platform/creator/collection grouping, aliases or user-defined rules.
 
+Plugin identity remains `gulanthys@anime-archive`, matching previously published packages so existing installations retain their update identity.
+
 ## Classification
 
 The host recognizes local file content with bounded reads. The plugin maps host-observed facts to stable category IDs: `video`, `audio`, `document`, `image`, `program`, and `archive`. Presentation, spreadsheet, formula, subtitle, ebook and content-derived `text/*` MIME types request `document`; compressed formats request `archive`; executable and package formats request `program`.

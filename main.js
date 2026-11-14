@@ -1,146 +1,50 @@
-// Parser source is concatenated by build.mjs so preview and archive routing share identical logic.
-function animeSettings() {
-  var value = flux.settings || {};
-  return AnimeArchiveParser.validate(value);
-}
+// Preview and archive callbacks share the same content-only classifier.
 function updatePreview(state) {
   try {
-    var cfg = Object.assign({}, state.config, { isGroup: !!state.isGroup });
-    if (state.metadataText) cfg.metadata = JSON.parse(state.metadataText);
-    else cfg.metadata = null;
-    var lines = String(state.fileName || '').split(/\r?\n/).filter(function (x) { return x.trim(); });
-    state.preview = lines.map(function (name) {
-      var result = AnimeArchiveParser.evaluate(name.trim(), cfg);
-      var destination = result && (result.directories ? result.directories.join(' / ') : result.folderName);
-      return name.trim() + ': ' + (destination ? destination + ' — ' + result.reason : 'unchanged' + (result && result.reason ? ' — ' + result.reason : ''));
-    }).join('\n');
+    var context = {
+      phase: state.phase || 'complete',
+      isGroup: !!state.isGroup,
+      detectedType: state.detectedKind ? { kind: state.detectedKind, mime: state.detectedMime || '', extension: state.detectedExtension || '' } : null
+    };
+    var result = AnimeArchiveParser.evaluate(context);
+    var destination = result.category || 'unchanged';
+    var names = String(state.fileName || '').split(/\r?\n/).map(function (name) { return name.trim(); }).filter(Boolean);
+    state.preview = 'SIMULATED ' + context.phase + ' · type ' + (state.detectedKind || '(unknown)') + '\n'
+      + (names.length ? names : ['(no filename)']).map(function (name) {
+        return name + ': ' + destination + ' — ' + result.reason;
+      }).join('\n');
     state.error = '';
   } catch (error) { state.preview = ''; state.error = String(error.message || error); }
 }
-async function updateSettings(state, patch) {
-  var next = AnimeArchiveParser.validate(Object.assign({}, state.config, patch));
-  await flux.settings.update(patch);
-  state.config = next;
-}
-function ruleFromState(state) {
-  function list(value) { return String(value || '').split(/\r?\n/).map(function (item) { return item.trim(); }).filter(Boolean); }
-  return { pattern: state.rulePattern, extensions: String(state.ruleExtensions || '').split(',').map(function (x) { return x.trim(); }).filter(Boolean), all: list(state.ruleAll), any: list(state.ruleAny), not: list(state.ruleNot), action: state.ruleAction, title: state.ruleTitle || undefined };
-}
 flux.ui.view('settings', {
   init: function () {
-    try { var c = animeSettings(); return { config: c, ruleDocumentText: JSON.stringify(c.ruleDocument, null, 2), isGroup: false, fileName: '', metadataText: '', aliasFrom: '', aliasTo: '', rulePattern: '', ruleExtensions: '', ruleAll: '', ruleAny: '', ruleNot: '', ruleAction: 'include', ruleTitle: '', videoGrouping: c.videoGrouping || 'auto', aliases: Object.keys(c.aliases).map(function (k) { return { from: k, to: c.aliases[k] }; }), rules: c.rules, error: '', preview: '' }; }
-    catch (error) { return { fileName: '', aliases: [], rules: [], error: String(error.message || error), preview: '' }; }
+    return { fileName: '', phase: 'complete', isGroup: false, detectedKind: '', detectedMime: '', detectedExtension: '', error: '', preview: '' };
   },
   render: function (state) {
     var h = flux.ui.h;
-    var children = [
-      h('textarea', { key: 'filename', value: state.fileName, placeholder: 'Preview filenames, one per line', rows: 4 }),
-      h('textarea', { key: 'source-metadata', value: state.metadataText || '', placeholder: 'Preview source metadata JSON (optional)', rows: 3 }),
-      h('switch', { key: 'preview-group', label: 'Task group preview (keep member directories)', checked: !!state.isGroup }),
-      h('select', { key: 'video-grouping', value: state.videoGrouping || 'auto', options: [{ value: 'auto', label: 'Automatic' }, { value: 'creator', label: 'Creator' }, { value: 'collection', label: 'Collection' }] }),
+    return h('stack', { gap: 'sm', padding: 'md' },
+      h('textarea', { key: 'filename', value: state.fileName, placeholder: 'Display filenames, one per line (not used for classification)', rows: 4 }),
+      h('select', { key: 'preview-phase', value: state.phase, options: [{ value: 'start', label: 'SIMULATED start' }, { value: 'complete', label: 'SIMULATED complete' }] }),
+      h('input', { key: 'preview-kind', value: state.detectedKind, placeholder: 'Simulated detected kind (e.g. image)' }),
+      h('input', { key: 'preview-mime', value: state.detectedMime, placeholder: 'Simulated content MIME (e.g. image/png)' }),
+      h('input', { key: 'preview-extension', value: state.detectedExtension, placeholder: 'Simulated detected format extension (e.g. png)' }),
+      h('switch', { key: 'preview-group', label: 'Task group preview (not classified)', checked: state.isGroup }),
       h('text', { text: state.error || state.preview || 'No classification match' }),
-      h('text', { text: 'Classification and folder layout rules (JSON). Each directory segment is created inside the authorized download root. Filename extensions are hints, not content inspection.' }),
-      h('textarea', { key: 'rule-document', value: state.ruleDocumentText || '', placeholder: 'Rule document JSON', rows: 12 }),
-      h('button', { key: 'save-document', text: 'Validate and save rules' }),
-      h('button', { key: 'reset-document', text: 'Use bundled rules' }),
-      h('input', { key: 'alias-source', value: state.aliasFrom || '', placeholder: 'Alias source title' }),
-      h('input', { key: 'alias-target', value: state.aliasTo || '', placeholder: 'Display folder title' }),
-      h('button', { key: 'save-alias', text: 'Add or update alias' }),
-      h('input', { key: 'rule-pattern', value: state.rulePattern || '', placeholder: 'Filename regex (optional)' }),
-      h('input', { key: 'rule-extensions', value: state.ruleExtensions || '', placeholder: 'Extensions, e.g. pdf, epub, mkv' }),
-      h('textarea', { key: 'rule-all', value: state.ruleAll || '', placeholder: 'All regex conditions, one per line', rows: 2 }),
-      h('textarea', { key: 'rule-any', value: state.ruleAny || '', placeholder: 'Any regex conditions, one per line', rows: 2 }),
-      h('textarea', { key: 'rule-not', value: state.ruleNot || '', placeholder: 'Excluded regex conditions, one per line', rows: 2 }),
-      h('select', { key: 'rule-action', value: state.ruleAction || 'include', options: [{ value: 'include', label: 'Include' }, { value: 'exclude', label: 'Exclude' }, { value: 'assign', label: 'Assign folder' }] }),
-      h('input', { key: 'rule-title', value: state.ruleTitle || '', placeholder: 'Folder template (capture with $1)' }),
-      h('button', { key: 'add-rule', text: 'Add ordered rule' }),
-      h('button', { key: 'update-rule', text: 'Update selected rule' })
-    ];
-    state.aliases.forEach(function (a, i) {
-      children.push(h('text', { text: 'Alias ' + (i + 1) + ': ' + a.from + ' → ' + a.to }));
-      children.push(h('button', { key: 'remove-alias-' + i, text: 'Remove alias ' + (i + 1) }));
-    });
-    state.rules.forEach(function (r, i) {
-      children.push(h('text', { text: (i + 1) + '. ' + r.action + ' /' + r.pattern + '/ ' + (r.title || '') }));
-      children.push(h('button', { key: 'edit-rule-' + i, text: 'Load rule ' + (i + 1) + ' for update' }));
-      children.push(h('button', { key: 'remove-rule-' + i, text: 'Remove rule ' + (i + 1) }));
-    });
-    return h.apply(null, ['stack', { gap: 'sm', padding: 'md' }].concat(children));
+      h('text', { text: 'SIMULATION ONLY. Shows the requested built-in category id; the host resolves it to the configured visible category. No filename, extension or source fallback; unknown content stays in place.' })
+    );
   },
-  event: async function (state, ev, ctx) {
-    try {
+  event: function (state, ev, ctx) {
+    if (ev.type === 'change') {
       var id = ev.node.split('/').pop();
-      if (ev.type === 'change') {
-        var value = String(ev.value || '');
-        if (id === 'filename') state.fileName = value;
-        else if (id === 'rule-document') state.ruleDocumentText = value;
-        else if (id === 'source-metadata') state.metadataText = value;
-        else if (id === 'preview-group') state.isGroup = ev.value === true;
-        else if (id === 'video-grouping') { await updateSettings(state, { videoGrouping: value }); state.videoGrouping = value; }
-        else if (id === 'alias-source') state.aliasFrom = value;
-        else if (id === 'alias-target') state.aliasTo = value;
-        else if (id === 'rule-pattern') state.rulePattern = value;
-        else if (id === 'rule-extensions') state.ruleExtensions = value;
-        else if (id === 'rule-all') state.ruleAll = value;
-        else if (id === 'rule-any') state.ruleAny = value;
-        else if (id === 'rule-not') state.ruleNot = value;
-        else if (id === 'rule-action') state.ruleAction = value;
-        else if (id === 'rule-title') state.ruleTitle = value;
-      } else if (ev.type === 'press' && id === 'save-document') {
-        await updateSettings(state, { ruleDocument: state.ruleDocumentText });
-        state.ruleDocumentText = JSON.stringify(state.config.ruleDocument, null, 2);
-      } else if (ev.type === 'press' && id === 'reset-document') {
-        await updateSettings(state, { ruleDocument: '' });
-        state.ruleDocumentText = JSON.stringify(state.config.ruleDocument, null, 2);
-      } else if (ev.type === 'press' && id === 'save-alias') {
-        var aliases = Object.assign({}, state.config.aliases);
-        var source = state.aliasFrom.trim();
-        var target = state.aliasTo.trim();
-        if (!source || !target) throw new Error('Both alias titles are required.');
-        aliases[source] = target;
-        await updateSettings(state, { aliases: JSON.stringify(aliases) });
-        state.aliases = Object.keys(aliases).map(function (k) { return { from: k, to: aliases[k] }; });
-      } else if (ev.type === 'press' && id.indexOf('remove-alias-') === 0) {
-        var aliases = Object.assign({}, state.config.aliases);
-        delete aliases[state.aliases[Number(id.slice(13))].from];
-        await updateSettings(state, { aliases: JSON.stringify(aliases) });
-        state.aliases = Object.keys(aliases).map(function (k) { return { from: k, to: aliases[k] }; });
-      } else if (ev.type === 'press' && id === 'add-rule') {
-        var rules = state.config.rules.slice();
-        rules.push(ruleFromState(state));
-        await updateSettings(state, { rules: JSON.stringify(rules) });
-        state.rules = rules;
-      } else if (ev.type === 'press' && id.indexOf('edit-rule-') === 0) {
-        var index = Number(id.slice(10));
-        var selected = state.rules[index];
-        state.rulePattern = selected.pattern || '';
-        state.ruleExtensions = Array.isArray(selected.extensions) ? selected.extensions.join(', ') : selected.extensions || '';
-        state.ruleAll = (selected.all || []).join('\n');
-        state.ruleAny = (selected.any || []).join('\n');
-        state.ruleNot = (selected.not || []).join('\n');
-        state.ruleAction = selected.action;
-        state.ruleTitle = selected.title || '';
-        state.selectedRule = index;
-      } else if (ev.type === 'press' && id.indexOf('remove-rule-') === 0) {
-        var index = Number(id.slice(12));
-        var rules = state.config.rules.slice();
-        rules.splice(index, 1);
-        await updateSettings(state, { rules: JSON.stringify(rules) });
-        state.rules = rules;
-        if (state.selectedRule === index) state.selectedRule = null;
-        else if (Number.isInteger(state.selectedRule) && state.selectedRule > index) state.selectedRule -= 1;
-      } else if (ev.type === 'press' && id === 'update-rule') {
-        var rules = state.config.rules.slice();
-        if (!Number.isInteger(state.selectedRule) || !rules[state.selectedRule]) throw new Error('Select a rule before updating it.');
-        rules[state.selectedRule] = ruleFromState(state);
-        await updateSettings(state, { rules: JSON.stringify(rules) });
-        state.rules = rules;
-      }
-      updatePreview(state);
-    } catch (error) {
-      state.preview = '';
-      state.error = String(error.message || error);
+      var value = String(ev.value || '');
+      if (id === 'filename') state.fileName = value;
+      else if (id === 'preview-phase') state.phase = value;
+      else if (id === 'preview-kind') state.detectedKind = value;
+      else if (id === 'preview-mime') state.detectedMime = value;
+      else if (id === 'preview-extension') state.detectedExtension = value;
+      else if (id === 'preview-group') state.isGroup = ev.value === true;
     }
+    updatePreview(state);
     ctx.refresh();
   }
 });

@@ -4,101 +4,99 @@ import { createRequire } from 'node:module';
 import { readFileSync } from 'node:fs';
 import vm from 'node:vm';
 const require = createRequire(import.meta.url);
-await import('../vendor/anitomy-0.0.35/anitomy.mjs');
-const { parse, evaluate, validate } = require('../parser.js');
-const bilibili = { platform: 'bilibili', mediaKind: 'post', creatorId: '3707002469485044', creatorName: '小猪仔步履不停', collectionId: '8878655', collectionTitle: '小猪仔评财报' };
-const filename = '【小猪仔】NBV单季度-54.1%，发生了啥？.mp4';
-const destination = (name, settings) => { const result = parse(name, settings); return result?.directories || (result?.folderName ? [result.folderName] : null); };
+const { parse } = require('../parser.js');
+const image = { kind: 'image', mime: 'image/png', extension: 'png' };
+const completed = (patch = {}) => ({ fileName: 'photo.txt', phase: 'complete', createdDate: '2026-11-14', ...patch });
 
-test('Bilibili source facts create the agreed hierarchy without renaming the file', () => {
-  assert.deepEqual(destination(filename, { metadata: bilibili }), ['视频', '哔哩哔哩', '小猪仔步履不停', '小猪仔评财报']);
-  assert.deepEqual(destination(filename, { metadata: { ...bilibili, collectionTitle: '' } }), ['视频', '哔哩哔哩', '小猪仔步履不停']);
-  assert.deepEqual(destination(filename, { metadata: { ...bilibili, platform: 'youtube' } }), ['视频', 'YouTube', '小猪仔步履不停', '小猪仔评财报']);
-});
-test('series source identity supports extensionless groups; unrelated file types are not treated as video', () => {
-  const metadata = { platform: 'bilibili', mediaKind: 'series', seriesId: '42', seriesTitle: '葬送的芙莉莲' };
-  assert.deepEqual(destination('合集', { metadata, isGroup: true }), ['视频', '哔哩哔哩', '葬送的芙莉莲']);
-  assert.deepEqual(destination('audio.m4a', { metadata }), ['音乐']);
-  assert.deepEqual(destination('notes.pdf', { metadata }), ['文档']);
-});
-test('episode parsing preserves title digits and aliases while common types and unknowns stay distinct', () => {
-  for (const [name, title] of [['凡人修仙传 第12集 [1080p].mkv', '凡人修仙传'], ['Frieren S02E03 [WEB-DL].mkv', 'Frieren'], ['86 - 01 [1080p].mkv', '86'], ['Some Anime 2024 - 01.mkv', 'Some Anime 2024']]) {
-    assert.deepEqual(destination(name), ['视频', title]);
+test('missing or unsupported content never falls back to filenames or source metadata', () => {
+  for (const fileName of ['photo.png', 'book.epub', 'archive.zip', 'Show S01E01.mkv', 'no-extension']) {
+    for (const detectedType of [undefined, null, { kind: 'other', mime: 'application/octet-stream', extension: 'bin' }]) {
+      assert.equal(parse(completed({
+        fileName, detectedType,
+        metadata: { platform: 'bilibili', mediaKind: 'series', seriesTitle: 'Series', creatorName: 'Creator' }
+      })), null);
+    }
   }
-  assert.deepEqual(destination('Show S01E01.mkv', { aliases: { Show: 'Display' } }), ['视频', 'Display']);
-  for (const [name, folder] of [['book.epub', '书籍'], ['art.webp', '图片'], ['track.flac', '音乐'], ['archive.7z', '压缩包'], ['installer.exe', '软件']]) assert.deepEqual(destination(name), [folder]);
-  assert.equal(parse('opaque-download'), null);
-  assert.equal(parse('unknown.qwerty'), null);
 });
-test('personal ordered filename rules override source and built-in rules', () => {
-  assert.equal(parse(filename, { metadata: bilibili, rules: [{ extensions: ['mp4'], action: 'exclude' }] }), null);
-  assert.deepEqual(destination('Study guide.pdf', { rules: [{ extensions: ['pdf'], all: ['Study'], any: ['guide', 'notes'], not: ['draft'], pattern: '(Study)', action: 'assign', title: 'Item $1' }] }), ['Item Study']);
-  assert.equal(parse('Study.pdf', { rules: [{ pattern: 'Study', action: 'assign', title: 'Docs/$1' }] }), null);
-  assert.throws(() => validate({ rules: [{ pattern: '[', action: 'include' }] }), /regex/);
+test('detected content alone determines the stable built-in category id', () => {
+  const cases = [
+    ['video', 'video/mp4', 'mp4', 'video'],
+    ['document', 'application/pdf', 'pdf', 'document'],
+    ['presentation', 'application/vnd.ms-powerpoint', 'ppt', 'document'],
+    ['spreadsheet', 'application/vnd.ms-excel', 'xls', 'document'],
+    ['formula', 'application/vnd.oasis.opendocument.formula', 'odf', 'document'],
+    ['subtitle', 'application/x-subrip', 'srt', 'document'],
+    ['image', 'image/png', 'png', 'image'],
+    ['audio', 'audio/flac', 'flac', 'audio'],
+    ['ebook', 'application/epub+zip', 'epub', 'document'],
+    ['archive', 'application/zip', 'zip', 'archive'],
+    ['compressed', 'application/gzip', 'gz', 'archive'],
+    ['executable', 'application/x-executable', 'elf', 'program'],
+    ['package', 'application/vnd.android.package-archive', 'apk', 'program'],
+    ['other', 'text/plain', 'txt', 'document']
+  ];
+  for (const [kind, mime, extension, category] of cases) {
+    for (const fileName of ['wrong.txt', 'Show S01E01.mkv', 'no-extension']) {
+      assert.deepEqual(parse(completed({
+        fileName, detectedType: { kind, mime, extension },
+        metadata: { platform: 'bilibili', mediaKind: 'series', seriesTitle: '../../Series' }
+      })), { category });
+    }
+  }
 });
-test('stable entity aliases and hostile metadata cannot become directory traversal', () => {
-  assert.deepEqual(destination(filename, { metadata: bilibili, aliases: { 'bilibili:creator:3707002469485044': '收藏作者' } }), ['视频', '哔哩哔哩', '收藏作者', '小猪仔评财报']);
-  const result = destination(filename, { metadata: { ...bilibili, creatorName: '../../evil\\name', collectionTitle: 'x:y' } });
-  assert.ok(result.every(part => !/[\\/:]/.test(part) && part !== '.' && part !== '..'));
-  const reserved = destination(filename, { metadata: { ...bilibili, creatorName: 'CON' } });
-  assert.ok(!reserved.includes('CON'));
+test('obsolete personal settings cannot change content classification', () => {
+  const context = completed({
+    detectedType: image, rules: '[', ruleDocument: '{', aliases: '{', videoGrouping: 'invalid',
+    metadata: { platform: 'bilibili', creatorName: '../../evil', collectionTitle: 'CON' }
+  });
+  assert.deepEqual(parse(context), { category: 'image' });
+  assert.equal(parse({ ...context, detectedType: null }), null);
 });
-test('directory preview and callback both reject paths beyond the host byte limit', () => {
-  const metadata = { ...bilibili, creatorName: '作'.repeat(40), collectionTitle: '集'.repeat(40) };
-  assert.equal(parse(filename, { metadata }), null);
-  assert.match(evaluate(filename, { metadata }).reason, /180 UTF-8 bytes/);
-});
-const custom = (when, directories) => ({ version: 1, classifiers: [], layouts: [{ id: 'personal', when, directories }] });
-test('custom layouts support recursive predicates, unicode glob, and explicit missing policies', () => {
-  const ruleDocument = custom({ all: [{ field: 'platform', equals: 'bilibili' }, { any: [{ field: 'fileName', glob: '*发生了啥？.MP4' }, { field: 'extension', in: ['mkv'] }] }, { not: { field: 'creatorName', equals: 'Excluded' } }] }, [{ text: '收藏' }, { field: 'creatorName' }, { field: 'seriesTitle', onMissing: 'omit' }, { field: 'collectionTitle', onMissing: 'fallback', fallback: '单篇' }]);
-  assert.deepEqual(destination(filename, { metadata: { ...bilibili, collectionTitle: '' }, ruleDocument }), ['收藏', '小猪仔步履不停', '单篇']);
-  assert.equal(parse('other.mp4', { metadata: bilibili, ruleDocument: custom({ field: 'fileName', glob: '*.pdf' }, [{ text: 'Docs' }]) })?.directories?.[0], undefined);
-});
-test('malformed documents, unknown fields, excessive nesting and unsafe literals are rejected before use', () => {
-  assert.throws(() => validate({ ruleDocument: '{' }), /JSON/);
-  assert.throws(() => validate({ ruleDocument: { version: 9, classifiers: [], layouts: [] } }), /version/);
-  assert.throws(() => validate({ ruleDocument: custom({ field: '__proto__', exists: true }, [{ text: 'Docs' }]) }), /field/);
-  for (const text of ['../escape', 'C:\\outside', '..', 'CON', 'trailing.']) assert.throws(() => validate({ ruleDocument: custom({ field: 'extension', equals: 'pdf' }, [{ text }]) }), /Unsafe/);
-  let when = { field: 'extension', equals: 'pdf' };
-  for (let i = 0; i < 10; i++) when = { not: when };
-  assert.throws(() => validate({ ruleDocument: custom(when, [{ text: 'Docs' }]) }), /nesting/);
-  assert.throws(() => validate({ ruleDocument: custom({ field: 'extension', exists: 'yes' }, [{ text: 'Docs' }]) }), /boolean/);
-  assert.throws(() => validate({ ruleDocument: custom({ field: 'extension', equals: 'pdf' }, Array.from({ length: 9 }, () => ({ text: 'Docs' }))) }), /1 to 8/);
-});
-function classificationView() {
-  let definition, rejectWrite = false;
-  const writes = [];
-  const context = vm.createContext({ flux: { settings: { aliases: '{}', rules: '[]', videoGrouping: 'auto', ruleDocument: '', update: async patch => { if (rejectWrite) throw new Error('settings storage unavailable'); writes.push(patch); } }, ui: { view: (_name, view) => { definition = view; } } } });
+test('archive callbacks defer files and leave groups unchanged even with supplied content', () => {
+  const context = vm.createContext({});
   vm.runInContext('globalThis.AnimeArchiveSeedRules = ' + readFileSync(new URL('../rules.json', import.meta.url), 'utf8'), context);
-  for (const path of ['../vendor/anitomy-0.0.35/anitomy.mjs', '../classifier.js', '../parser.js', '../main.js']) vm.runInContext(readFileSync(new URL(path, import.meta.url), 'utf8'), context);
-  const state = definition.init();
-  const send = (node, type, value) => definition.event(state, { node: 'root/' + node, type, value }, { refresh() {} });
-  return { state, send, writes, rejectWrites() { rejectWrite = true; } };
-}
-test('portable view saves validated rules and uses the confirmed configuration in preview', async () => {
-  const view = classificationView();
-  await view.send('source-metadata', 'change', JSON.stringify(bilibili));
-  await view.send('filename', 'change', filename);
-  assert.match(view.state.preview, /视频 \/ 哔哩哔哩 \/ 小猪仔步履不停 \/ 小猪仔评财报/);
-  const doc = JSON.stringify(custom({ field: 'platform', equals: 'bilibili' }, [{ text: '我的收藏' }, { field: 'creatorName' }]));
-  await view.send('rule-document', 'change', doc);
-  await view.send('save-document', 'press');
-  assert.match(view.state.preview, /我的收藏 \/ 小猪仔步履不停/);
-  assert.equal(view.writes.at(-1).ruleDocument, doc);
-  view.rejectWrites();
-  await view.send('rule-document', 'change', JSON.stringify(custom({ field: 'platform', equals: 'bilibili' }, [{ text: '不应生效' }])));
-  await view.send('save-document', 'press');
-  assert.match(view.state.error, /storage unavailable/);
-  await view.send('filename', 'change', filename);
-  assert.match(view.state.preview, /我的收藏/);
-  assert.doesNotMatch(view.state.preview, /不应生效/);
+  for (const path of ['../classifier.js', '../parser.js', '../archive.js']) vm.runInContext(readFileSync(new URL(path, import.meta.url), 'utf8'), context);
+  const invoke = patch => {
+    context.input = { ...completed(patch), categoryRouting: true };
+    return vm.runInContext('archive(input)', context);
+  };
+  assert.equal(invoke({ phase: 'start', detectedType: image }), null);
+  assert.deepEqual({ ...invoke({ detectedType: image }) }, { category: 'image' });
+  for (const phase of ['start', 'complete']) assert.equal(invoke({ phase, isGroup: true, detectedType: image }), null);
+  assert.equal(invoke({ detectedType: null }), null);
+  assert.throws(() => invoke({ phase: undefined }), /0.6.5/);
+  context.input = completed({ detectedType: image });
+  assert.throws(() => vm.runInContext('archive(input)', context), /category-routing support/);
+  context.input = { ...completed({ detectedType: image }), categoryRouting: false };
+  assert.throws(() => vm.runInContext('archive(input)', context), /category-routing support/);
 });
-test('invalid editor content never reaches settings storage', async () => {
-  const view = classificationView();
-  await view.send('rule-document', 'change', '{');
-  await view.send('save-document', 'press');
-  assert.match(view.state.error, /JSON/);
-  assert.equal(view.writes.length, 0);
-  await view.send('reset-document', 'press');
-  assert.equal(view.writes.at(-1).ruleDocument, '');
+test('invalid content facts reject rather than guessing from a filename', () => {
+  for (const detectedType of [[], 'image', { ...image, kind: '../image' }, { ...image, extension: '../png' }, { ...image, mime: 5 }]) {
+    assert.throws(() => parse(completed({ fileName: 'photo.png', detectedType })), /content detection/);
+  }
+});
+test('portable preview switches between recognized, unknown, pending and group results', () => {
+  let view;
+  const context = vm.createContext({ flux: { ui: { view: (_name, definition) => { view = definition; } } } });
+  vm.runInContext('globalThis.AnimeArchiveSeedRules = ' + readFileSync(new URL('../rules.json', import.meta.url), 'utf8'), context);
+  for (const path of ['../classifier.js', '../parser.js', '../main.js']) vm.runInContext(readFileSync(new URL(path, import.meta.url), 'utf8'), context);
+  const state = view.init();
+  const send = (node, value) => view.event(state, { node: 'root/' + node, type: 'change', value }, { refresh() {} });
+  send('filename', 'photo.png');
+  assert.match(state.preview, /photo\.png: unchanged/);
+  send('preview-kind', 'image');
+  send('preview-mime', 'image/png');
+  send('preview-extension', 'png');
+  assert.match(state.preview, /photo\.png: image/);
+  send('filename', 'Show S01E01.mkv');
+  assert.match(state.preview, /Show S01E01\.mkv: image/);
+  send('preview-phase', 'start');
+  assert.match(state.preview, /unchanged — Waiting for completed file content/);
+  send('preview-phase', 'complete');
+  assert.match(state.preview, /Show S01E01\.mkv: image/);
+  send('preview-group', true);
+  assert.match(state.preview, /unchanged — Task groups/);
+  send('preview-group', false);
+  send('preview-kind', '');
+  assert.match(state.preview, /unchanged — No recognized file content/);
 });

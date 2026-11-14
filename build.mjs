@@ -16,16 +16,16 @@ JSON.parse(seedRules);
 const seed = `globalThis.AnimeArchiveSeedRules = ${seedRules};\n`;
 const parser = await readFile(join(root, 'parser.js'), 'utf8');
 const classifier = await readFile(join(root, 'classifier.js'), 'utf8');
-const anitomy = await readFile(join(root, 'vendor/anitomy-0.0.35/anitomy.mjs'), 'utf8');
-const license = await readFile(join(root, 'vendor/anitomy-0.0.35/LICENSE'), 'utf8');
-const attribution = `/*\n * anitomy@0.0.35, https://github.com/yjl9903/anitomy\n * MIT License; bundled from https://registry.npmjs.org/anitomy/-/anitomy-0.0.35.tgz\n${license.split(/\r?\n/).map(line => ` * ${line}`).join('\n')}\n */\n`;
 for (const name of ['archive.js', 'main.js']) {
-  const source = attribution + anitomy + '\n' + seed + classifier + '\n' + parser + '\n' + await readFile(join(root, name), 'utf8');
+  const source = seed + classifier + '\n' + parser + '\n' + await readFile(join(root, name), 'utf8');
   await writeFile(join(dist, name), source);
 }
 await writeFile(join(dist, 'manifest.json'), manifestText);
 const archive = join(root, archiveName);
 const tempZip = archive + '.zip';
-const zip = spawnSync('powershell.exe', ['-NoProfile', '-Command', `Compress-Archive -Path '${dist}\\\\*' -DestinationPath '${tempZip}' -Force`], { stdio: 'inherit' });
-if (zip.status !== 0) throw new Error('Compress-Archive failed');
+const psQuote = value => `'${value.replace(/'/g, "''")}'`;
+const platformZip = process.platform === 'win32'
+  ? spawnSync('powershell.exe', ['-NoProfile', '-Command', `Compress-Archive -Path ${psQuote(join(dist, '*'))} -DestinationPath ${psQuote(tempZip)} -Force`], { stdio: 'inherit' })
+  : spawnSync('zip', ['-q', '-r', tempZip, '.'], { cwd: dist, stdio: 'inherit' });
+if (platformZip.status !== 0) throw new Error('Plugin archive compression failed');
 await (await import('node:fs/promises')).rename(tempZip, archive);

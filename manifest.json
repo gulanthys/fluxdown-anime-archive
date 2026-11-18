@@ -1,11 +1,39 @@
 {
   "identity": "gulanthys@anime-archive",
   "name": "FluxDown Classification",
-  "version": "1.5.0",
-  "description": "Requests stable built-in save categories using host-observed file content only; preserves downloaded filenames.",
+  "version": "1.6.0",
+  "description": "Archives completed downloads by content category, completion date, or both.",
   "homepage": "https://github.com/gulanthys",
   "minAppVersion": "0.6.5",
   "permissions": ["archive"],
+  "settings": [{
+    "key": "archiveMode",
+    "title": "Archive layout",
+    "description": "Used when the download completes. Date modes require host support; otherwise, only category routing applies.",
+    "type": "string",
+    "widget": "select",
+    "default": "category",
+    "options": [
+      { "value": "category", "label": "Category only" },
+      { "value": "day", "label": "Completion day only" },
+      { "value": "month", "label": "Completion month only" },
+      { "value": "category-day", "label": "Category / completion day" },
+      { "value": "category-month", "label": "Category / completion month" }
+    ],
+    "localizations": {
+      "zh-Hans": {
+        "title": "归档方式",
+        "description": "在下载完成时应用，日期取宿主本地时间。仅按日期时使用默认下载目录；组合模式没有可用的分类目录时也使用默认下载目录。不支持日期归档的宿主仍仅按分类。",
+        "options": {
+          "category": "仅按分类（如 图片）",
+          "day": "仅按完成日（如 20260731）",
+          "month": "仅按完成月（如 202607）",
+          "category-day": "先按分类，再按完成日（如 图片/20260731）",
+          "category-month": "先按分类，再按完成月（如 图片/202607）"
+        }
+      }
+    }
+  }],
   "main": { "entry": "main.js" },
   "contributes": { "archive": "archive.js", "views": [{ "id": "settings", "title": "Classification preview", "location": "settings" }] }
 }

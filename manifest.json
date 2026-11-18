@@ -1,7 +1,7 @@
 {
   "identity": "gulanthys@anime-archive",
   "name": "FluxDown Classification",
-  "version": "1.6.0",
+  "version": "1.6.1",
   "description": "Archives completed downloads by content category, completion date, or both.",
   "homepage": "https://github.com/gulanthys",
   "minAppVersion": "0.6.5",
@@ -21,7 +21,18 @@
       { "value": "category-month", "label": "Category / completion month" }
     ],
     "localizations": {
-      "zh-Hans": {
+      "en": {
+        "title": "Archive layout",
+        "description": "Used when the download completes. Date modes require host support; otherwise, only category routing applies.",
+        "options": {
+          "category": "Category only",
+          "day": "Completion day only",
+          "month": "Completion month only",
+          "category-day": "Category / completion day",
+          "category-month": "Category / completion month"
+        }
+      },
+      "zh": {
         "title": "归档方式",
         "description": "在下载完成时应用，日期取宿主本地时间。仅按日期时使用默认下载目录；组合模式没有可用的分类目录时也使用默认下载目录。不支持日期归档的宿主仍仅按分类。",
         "options": {

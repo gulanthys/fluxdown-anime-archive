@@ -1,6 +1,6 @@
 # FluxDown Classification
 
-Version **1.6.0**. Completed downloads can be archived by content category, completion date, or both. No filename/extension fallback, episode parsing, source-platform/creator/collection grouping, aliases or user-defined rules.
+Version **1.6.1**. Completed downloads can be archived by content category, completion date, or both. No filename/extension fallback, episode parsing, source-platform/creator/collection grouping, aliases or user-defined rules.
 
 Plugin identity remains `gulanthys@anime-archive`, matching previously published packages so existing installations retain their update identity.
 
@@ -55,7 +55,11 @@ node --test scripts/parser.test.mjs
 node build.mjs
 ```
 
-Build bundles only internal rules, classifier, parser and entrypoints into `dist/` and produces `anime-archive-1.6.0.fxplug`. No vendored filename parser or Node/npm runtime dependency remains. Windows uses PowerShell compression; macOS/Linux use `zip`.
+Build bundles only internal rules, classifier, parser and entrypoints into `dist/` and produces `anime-archive-1.6.1.fxplug`. No vendored filename parser or Node/npm runtime dependency remains. Windows uses PowerShell compression; macOS/Linux use `zip`.
+
+## 1.6.1 changes
+
+- Declare explicit English and Chinese setting translations required by the plugin market.
 
 ## 1.6.0 changes
 

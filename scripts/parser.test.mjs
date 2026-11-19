@@ -53,7 +53,7 @@ test('obsolete personal settings cannot change content classification', () => {
   assert.equal(parse({ ...context, detectedType: null }), null);
 });
 test('archive callbacks defer files and leave groups unchanged even with supplied content', () => {
-  const settings = {};
+  const settings = { archiveMode: 'day' };
   const context = vm.createContext({ flux: { settings } });
   vm.runInContext('globalThis.AnimeArchiveSeedRules = ' + readFileSync(new URL('../rules.json', import.meta.url), 'utf8'), context);
   for (const path of ['../classifier.js', '../parser.js', '../archive.js']) vm.runInContext(readFileSync(new URL(path, import.meta.url), 'utf8'), context);
@@ -65,53 +65,16 @@ test('archive callbacks defer files and leave groups unchanged even with supplie
   assert.deepEqual({ ...invoke({ detectedType: image }) }, { category: 'image' });
   for (const phase of ['start', 'complete']) assert.equal(invoke({ phase, isGroup: true, detectedType: image }), null);
   assert.equal(invoke({ detectedType: null }), null);
-  for (const [mode, expected] of [
-    ['category', { category: 'image' }],
-    ['day', { dateBucket: 'day' }],
-    ['month', { dateBucket: 'month' }],
-    ['category-day', { category: 'image', dateBucket: 'day' }],
-    ['category-month', { category: 'image', dateBucket: 'month' }],
-  ]) {
-    settings.archiveMode = mode;
-    assert.deepEqual({ ...invoke({ detectedType: image, completedDate: '2026-07-31' }) }, expected);
-    assert.deepEqual({ ...invoke({ detectedType: image }) }, { category: 'image' });
-    assert.equal(invoke({ phase: 'start', completedDate: '2026-07-31' }), null);
-    assert.equal(invoke({ isGroup: true, completedDate: '2026-07-31' }), null);
-  }
-  assert.deepEqual({ ...invoke({ completedDate: '2026-07-31' }) }, { dateBucket: 'month' });
+  assert.deepEqual({ ...invoke({ detectedType: image, completedDate: '2026-07-31' }) }, { category: 'image' });
+  assert.equal(invoke({ completedDate: '2026-07-31' }), null);
   assert.throws(() => invoke({ phase: undefined }), /0.6.5/);
   context.input = completed({ detectedType: image });
-  assert.throws(() => vm.runInContext('archive(input)', context), /category-routing support/);
+  assert.throws(() => vm.runInContext('archive(input)', context), /内置分类路由/);
   context.input = { ...completed({ detectedType: image }), categoryRouting: false };
-  assert.throws(() => vm.runInContext('archive(input)', context), /category-routing support/);
+  assert.throws(() => vm.runInContext('archive(input)', context), /内置分类路由/);
 });
 test('invalid content facts reject rather than guessing from a filename', () => {
   for (const detectedType of [[], 'image', { ...image, kind: '../image' }, { ...image, extension: '../png' }, { ...image, mime: 5 }]) {
-    assert.throws(() => parse(completed({ fileName: 'photo.png', detectedType })), /content detection/);
+    assert.throws(() => parse(completed({ fileName: 'photo.png', detectedType })), /内容识别/);
   }
-});
-test('portable preview switches between recognized, unknown, pending and group results', () => {
-  let view;
-  const context = vm.createContext({ flux: { ui: { view: (_name, definition) => { view = definition; } } } });
-  vm.runInContext('globalThis.AnimeArchiveSeedRules = ' + readFileSync(new URL('../rules.json', import.meta.url), 'utf8'), context);
-  for (const path of ['../classifier.js', '../parser.js', '../main.js']) vm.runInContext(readFileSync(new URL(path, import.meta.url), 'utf8'), context);
-  const state = view.init();
-  const send = (node, value) => view.event(state, { node: 'root/' + node, type: 'change', value }, { refresh() {} });
-  send('filename', 'photo.png');
-  assert.match(state.preview, /photo\.png: unchanged/);
-  send('preview-kind', 'image');
-  send('preview-mime', 'image/png');
-  send('preview-extension', 'png');
-  assert.match(state.preview, /photo\.png: image/);
-  send('filename', 'Show S01E01.mkv');
-  assert.match(state.preview, /Show S01E01\.mkv: image/);
-  send('preview-phase', 'start');
-  assert.match(state.preview, /unchanged — Waiting for completed file content/);
-  send('preview-phase', 'complete');
-  assert.match(state.preview, /Show S01E01\.mkv: image/);
-  send('preview-group', true);
-  assert.match(state.preview, /unchanged — Task groups/);
-  send('preview-group', false);
-  send('preview-kind', '');
-  assert.match(state.preview, /unchanged — No recognized file content/);
 });

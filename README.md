@@ -1,73 +1,25 @@
-# FluxDown Classification
+# 文件分类归档
 
-Version **1.6.1**. Completed downloads can be archived by content category, completion date, or both. No filename/extension fallback, episode parsing, source-platform/creator/collection grouping, aliases or user-defined rules.
+版本 **1.6.2**。根据 FluxDown 识别到的文件内容归档到内置分类的保存目录。插件标识仍为 `gulanthys@anime-archive`，已安装用户可原位升级。
 
-Plugin identity remains `gulanthys@anime-archive`, matching previously published packages so existing installations retain their update identity.
+## 保存目录
 
-## Archive layout
+插件没有独立设置或预览，也不再读取旧的归档方式或执行日期归档。请在 **FluxDown → 设置 → 下载 → 自定义分类** 中管理分类保存目录。
 
-In the plugin’s basic settings, choose **Archive layout** (**归档方式** in the Simplified Chinese UI). **Classification preview** is a separate view, not the archive setting.
+插件只返回稳定的内置分类 ID，不用 ID、界面语言或译文拼接路径。FluxDown 使用任务提交时配置的内置分类保存目录：设为 `Downloads/图片` 就存到 `Downloads/图片`，设为 `Downloads/写真` 就存到 `Downloads/写真`。切换界面语言不会更改已保存的路径。当前宿主的「一键分类目录」会给内置分类生成英文名；如需中文目录，在宿主中编辑该分类的保存目录。插件不覆盖已有目录，也不在未配置目录时创建英文目录。
 
-| Layout | Example |
-| --- | --- |
-| Category only (default) | `Downloads/图片` |
-| Completion day or month only | `Downloads/20260731` or `Downloads/202607` |
-| Category / completion day or month | `Downloads/图片/20260731` or `Downloads/图片/202607` |
+## 分类规则
 
-Date layouts use the FluxDown host's local date at completion, after post-processing. Date-only uses the task's authorized default directory even if the host initially routed it to a category. Combined layouts append a date to the configured category directory; unknown content or a missing category directory uses the authorized default directory instead. The host creates the date directory and moves the file; existing path and conflict checks still apply.
+- 依据文件内容区分视频、音频、文档、图片、程序和压缩包，不按文件名、扩展名、来源或语言猜测。例如实际为 PNG 的 `photo.txt` 请求图片分类。
+- 无法识别内容，或分类隐藏、缺失或未配置保存目录时，插件不移动文件。手动指定目录的任务和任务组不参与插件归档。
+- BT 任务首次完成时，只有恰好选中一个非填充文件才可按内容归档。FluxDown 负责迁移整个任务根目录并恢复做种；多选或移动冲突时保留原位置。
+- 需要 FluxDown 0.6.5 或更高版本，且归档上下文必须提供 `categoryRouting: true`。宿主负责路径校验、冲突处理和文件移动。
 
-Date layouts require a FluxDown build that advertises `completedDate` to the archive callback. Hosts without it, and BT tasks on supporting hosts, keep category-only routing. Explicit save directories, eD2K downloads and task groups are not date-bucketed.
+## 构建与验证
 
-## Classification
-
-The host recognizes local file content with bounded reads. The plugin maps host-observed facts to stable category IDs: `video`, `audio`, `document`, `image`, `program`, and `archive`. Presentation, spreadsheet, formula, subtitle, ebook and content-derived `text/*` MIME types request `document`; compressed formats request `archive`; executable and package formats request `program`.
-
-- PNG content named `photo.txt` requests `image`.
-- An extensionless PDF requests `document`.
-- A ZIP named `book.epub` requests `archive`.
-- In category-only mode, unknown, missing or unsupported recognition does not request a category, even if the filename or source suggests a known type.
-- Original filenames are preserved. Video files do not gain author, collection or episode-title subdirectories.
-
-The host resolves each stable built-in category ID to its configured visible category and save directory. Hidden, unconfigured or missing categories stay in place; arbitrary custom category names are not inferred. The plugin does not know or display the resolved path. The host owns path validation, conflict handling and file movement. It does not read, execute, extract, upload or rename files. Explicit save directories bypass automatic routing.
-
-## BT and groups
-
-At first completion, exactly one selected non-padding BT file can be classified, including one selected file from a multi-file torrent. The host reads that actual final file and moves the whole task root through its BT storage migration, preserving internal relative paths and boundary pieces, then restores seeding. Multiple selections, explicit directories, recognition errors and move conflicts stay in place. There is no repeated automatic move on reseeding, restart or later selection changes. Location updates are asynchronous after completion.
-
-Task groups have no single recognized file content and are not classified by this plugin. Member paths are preserved.
-
-## Preview
-
-Open **Classification preview**. Simulate kind, content MIME, detected format extension, start/completion and group state. Display filenames are not classification inputs. The preview displays the requested category ID only; it cannot show the host-resolved visible category or save directory.
-
-Historical `ruleDocument`, `rules`, `aliases` and `videoGrouping` values are no longer consumed. Built-in mappings update only with the plugin; no remote rule feed or scheduled download is configured.
-
-## Host contract
-
-Requires FluxDown 0.6.5 or later with explicit `categoryRouting: true` support in the archive context. Older hosts and hosts without this capability are explicitly rejected.
-
-Classification uses `phase`, `isGroup`, `categoryRouting` and host-observed `detectedType` (`kind`, `mime`, `extension`). Ordinary files defer until completion; groups return `null`. Date layouts request `dateBucket: "day" | "month"`, optionally with a built-in `category` ID, only when `completedDate` is present. The host derives the folder name from its own date. No raw bytes or local filesystem paths are exposed to the plugin.
-
-## Build and verify
-
-```text
+```sh
 node --test scripts/parser.test.mjs
 node build.mjs
 ```
 
-Build bundles only internal rules, classifier, parser and entrypoints into `dist/` and produces `anime-archive-1.6.1.fxplug`. No vendored filename parser or Node/npm runtime dependency remains. Windows uses PowerShell compression; macOS/Linux use `zip`.
-
-## 1.6.1 changes
-
-- Declare explicit English and Chinese setting translations required by the plugin market.
-
-## 1.6.0 changes
-
-- Added a persisted archive layout setting for category-only, completion-date-only, and category-then-date routing.
-- Kept category-only as the default and compatibility behavior.
-
-## 1.5.0 changes
-
-- Replaced fixed directory labels with stable built-in category IDs resolved by the host.
-- Require explicit host `categoryRouting` capability and reject older hosts.
-- Preview shows only the requested category ID, not an assumed save directory.
+构建生成 `anime-archive-1.6.2.fxplug`。运行插件不需要 Node 或 npm。

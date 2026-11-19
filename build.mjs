@@ -16,10 +16,8 @@ JSON.parse(seedRules);
 const seed = `globalThis.AnimeArchiveSeedRules = ${seedRules};\n`;
 const parser = await readFile(join(root, 'parser.js'), 'utf8');
 const classifier = await readFile(join(root, 'classifier.js'), 'utf8');
-for (const name of ['archive.js', 'main.js']) {
-  const source = seed + classifier + '\n' + parser + '\n' + await readFile(join(root, name), 'utf8');
-  await writeFile(join(dist, name), source);
-}
+const entry = await readFile(join(root, 'archive.js'), 'utf8');
+await writeFile(join(dist, 'archive.js'), seed + classifier + '\n' + parser + '\n' + entry);
 await writeFile(join(dist, 'manifest.json'), manifestText);
 const archive = join(root, archiveName);
 const tempZip = archive + '.zip';

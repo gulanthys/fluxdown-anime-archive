@@ -1,10 +1,49 @@
 {
   "identity": "gulanthys@anime-archive",
   "name": "文件分类归档",
-  "version": "1.6.2",
+  "version": "1.6.3",
   "description": "按下载文件的实际内容分类，归档到 FluxDown 内置分类配置的保存目录。",
   "homepage": "https://github.com/gulanthys",
   "minAppVersion": "0.6.5",
   "permissions": ["archive"],
+  "settings": [{
+    "key": "archiveMode",
+    "title": "归档方式",
+    "description": "日期使用宿主本地的下载完成时间。不支持日期归档时，仅按分类。",
+    "type": "string",
+    "widget": "select",
+    "default": "category",
+    "options": [
+      { "value": "category", "label": "仅按分类" },
+      { "value": "day", "label": "仅按完成日" },
+      { "value": "month", "label": "仅按完成月" },
+      { "value": "category-day", "label": "先按分类，再按完成日" },
+      { "value": "category-month", "label": "先按分类，再按完成月" }
+    ],
+    "localizations": {
+      "zh": {
+        "title": "归档方式",
+        "description": "日期使用宿主本地的下载完成时间。不支持日期归档时，仅按分类。",
+        "options": {
+          "category": "仅按分类",
+          "day": "仅按完成日（20260731）",
+          "month": "仅按完成月（202607）",
+          "category-day": "先按分类，再按完成日（图片/20260731）",
+          "category-month": "先按分类，再按完成月（图片/202607）"
+        }
+      },
+      "en": {
+        "title": "Archive layout",
+        "description": "Date layouts use the host's local date at download completion. Hosts without date support use category-only routing.",
+        "options": {
+          "category": "Category only",
+          "day": "Completion day only (20260731)",
+          "month": "Completion month only (202607)",
+          "category-day": "Category / completion day",
+          "category-month": "Category / completion month"
+        }
+      }
+    }
+  }],
   "contributes": { "archive": "archive.js" }
 }

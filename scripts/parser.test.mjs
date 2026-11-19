@@ -53,7 +53,7 @@ test('obsolete personal settings cannot change content classification', () => {
   assert.equal(parse({ ...context, detectedType: null }), null);
 });
 test('archive callbacks defer files and leave groups unchanged even with supplied content', () => {
-  const settings = { archiveMode: 'day' };
+  const settings = {};
   const context = vm.createContext({ flux: { settings } });
   vm.runInContext('globalThis.AnimeArchiveSeedRules = ' + readFileSync(new URL('../rules.json', import.meta.url), 'utf8'), context);
   for (const path of ['../classifier.js', '../parser.js', '../archive.js']) vm.runInContext(readFileSync(new URL(path, import.meta.url), 'utf8'), context);
@@ -65,8 +65,21 @@ test('archive callbacks defer files and leave groups unchanged even with supplie
   assert.deepEqual({ ...invoke({ detectedType: image }) }, { category: 'image' });
   for (const phase of ['start', 'complete']) assert.equal(invoke({ phase, isGroup: true, detectedType: image }), null);
   assert.equal(invoke({ detectedType: null }), null);
-  assert.deepEqual({ ...invoke({ detectedType: image, completedDate: '2026-07-31' }) }, { category: 'image' });
-  assert.equal(invoke({ completedDate: '2026-07-31' }), null);
+  const completedDate = '2026-07-31';
+  for (const [archiveMode, expected] of [
+    ['category', { category: 'image' }],
+    ['day', { dateBucket: 'day' }],
+    ['month', { dateBucket: 'month' }],
+    ['category-day', { category: 'image', dateBucket: 'day' }],
+    ['category-month', { category: 'image', dateBucket: 'month' }],
+  ]) {
+    settings.archiveMode = archiveMode;
+    assert.deepEqual({ ...invoke({ detectedType: image, completedDate }) }, expected);
+    assert.deepEqual({ ...invoke({ detectedType: image }) }, { category: 'image' });
+    assert.equal(invoke({ phase: 'start', completedDate }), null);
+    assert.equal(invoke({ isGroup: true, completedDate }), null);
+  }
+  assert.deepEqual({ ...invoke({ completedDate }) }, { dateBucket: 'month' });
   assert.throws(() => invoke({ phase: undefined }), /0.6.5/);
   context.input = completed({ detectedType: image });
   assert.throws(() => vm.runInContext('archive(input)', context), /内置分类路由/);
